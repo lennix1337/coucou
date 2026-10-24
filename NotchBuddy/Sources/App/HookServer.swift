@@ -482,7 +482,10 @@ final class HookServer: @unchecked Sendable {
         // and which session owns the project name shown on it.
         let display = PillSessionRegistry.Display(
             session: sessionId,
-            projectName: isExternalAgent ? (validAgent ?? projectName) : projectName,
+            projectName: isExternalAgent
+                ? AgentIdentity.displayName(agent: validAgent ?? projectName,
+                                            model: payload["coucou_model"] as? String)
+                : projectName,
             cwd: isExternalAgent ? "" : cwd,
             hostApp: hostApp, bundleId: bundleId)
         // For sessions that carry no id, derive a unique key from pill + cwd so that
@@ -1110,6 +1113,10 @@ final class HookServer: @unchecked Sendable {
         sessions.note(pill: pill, display: display, working: working)
         if let externalAgent {
             upsertExternalAgent(id: pill, name: externalAgent)
+            if sessions.ownsDisplay(pill: pill, session: display.session),
+               let idx = AppState.shared.tasks.firstIndex(where: { $0.id == pill }) {
+                AppState.shared.tasks[idx].name = display.projectName
+            }
         } else {
             upsertWorkspaceTask(id: pill, projectName: display.projectName, cwd: display.cwd,
                                 hostApp: display.hostApp, bundleId: display.bundleId,

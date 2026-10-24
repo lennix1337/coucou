@@ -2,6 +2,9 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 mkdir -p scratchpad
+swiftc NotchBuddy/Sources/CoucouKit/AgentIdentity.swift tests/AgentIdentityTests.swift \
+  -o scratchpad/agent-identity-tests
+scratchpad/agent-identity-tests
 swiftc NotchBuddy/Sources/CoucouKit/PillCatalog.swift tests/PiWorkspaceTests.swift \
   -o scratchpad/pi-workspace-tests
 scratchpad/pi-workspace-tests

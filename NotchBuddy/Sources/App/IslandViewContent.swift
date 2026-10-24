@@ -760,7 +760,7 @@ struct FinishedView: View {
         ZStack {
             CardBackground(wash: .green)
             VStack(alignment: .leading, spacing: 5) {
-                AgentWho(task: state.focusTask, label: "Claude Code finished")
+                AgentWho(task: state.focusTask, label: "Session finished")
                 Text({
                     if let fl = state.focusTask?.finalLine { return fl }
                     if let s = state.focusTask?.steps.last(where: { !$0.isDiffStep }) { return s }
@@ -4177,7 +4177,7 @@ struct AgentPill: View {
 
     // The Claude pill shows "VS Code" (or "Claude Code" for a terminal session) regardless of project name
     private var displayName: String {
-        if task.id == "agent_pi" { return "Pi" }
+        if task.id == "agent_pi" { return task.name }
         return task.id == "integration_claude" ? ClaudeHost.pillName(hostApp: task.hostApp) : task.name
     }
 

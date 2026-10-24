@@ -31,6 +31,11 @@ run `npm run install:acp-hook` in that checkout and `/reload` in Pi. Hooks forwa
 metadata only and do not grant permissions. Child and ACP cards keep their
 separate identities. App Store builds retain their original workspace default.
 
+The Pi card shows `Pi · provider/model-id` when the extension supplies bounded
+`coucou_model` metadata. It follows the session that owns the card, not a sibling
+session's model. Missing metadata shows only Pi; the app never guesses Claude Code
+or Codex from a terminal. Completion uses the neutral “Session finished” label.
+
 To revert, quit Coucou, restore `scratchpad/Coucou.previous.app` to
 `/Applications/Coucou.app`, and choose the desired workspace in Settings.
 Do not replace this fork with the upstream Homebrew cask when restoring the Pi setup.
