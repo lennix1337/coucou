@@ -1947,6 +1947,12 @@ struct IntegrationCardView: View {
             #else
             return false
             #endif
+        case "agent_pi":
+            #if !APPSTORE
+            return PiHookSetup().status().configured
+            #else
+            return false
+            #endif
         case "agent_opencode":
             #if !APPSTORE
             return HookServer.openCodePluginInstalled()

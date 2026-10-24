@@ -26,10 +26,16 @@ This is a local build, not a signed/notarized release. It has no CloudKit/iPhone
 link. Do not disable Gatekeeper or copy someone else's development signing team.
 Changing signing identity may require granting macOS permissions again.
 
-Install the personal `pi-coucou` package through Pi settings (once only), then
-run `npm run install:acp-hook` in that checkout and `/reload` in Pi. Hooks forward
-metadata only and do not grant permissions. Child and ACP cards keep their
-separate identities. App Store builds retain their original workspace default.
+In **Settings → Agents → Pi Agent** (the first section), use **Install / Repair…** and select the
+already-installed `pi-coucou` package folder. This native action registers the Pi
+extension and ACP hook, preserves other settings, and refuses malformed settings
+or foreign hooks. It runs no shell commands and changes no permission policy.
+Package dependencies must already be installed. Run `/reload` in Pi afterward.
+**Refresh status** checks the settings, package files and ACP symlink target;
+configuration is not proof the running Pi loaded the extension or that macOS
+permissions are granted. Live activity in the notch is the separate runtime check.
+Hooks forward metadata only. Child and ACP cards keep separate identities.
+App Store builds retain their original workspace default.
 
 The Pi card shows `Pi · provider/model-id` when the extension supplies bounded
 `coucou_model` metadata. It follows the session that owns the card, not a sibling

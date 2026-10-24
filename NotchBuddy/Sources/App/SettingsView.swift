@@ -584,6 +584,10 @@ struct SettingsView: View {
     // MARK: - Agents section
 
     @ViewBuilder private var agentsSection: some View {
+        #if !APPSTORE
+        PiHookSettingsView()
+        #endif
+
         GroupBox(String(localized: "hooks.claude-code.title")) {
             VStack(alignment: .leading, spacing: 10) {
                 if hookNeedsUpdate {
@@ -2195,6 +2199,7 @@ struct SettingsView: View {
             if def.id == "agent_codex"         && !HookServer.codexHooksInstalled()      { return String(localized: "Hooks not installed") }
             if def.id == "agent_copilot"       && !HookServer.copilotHooksInstalled()    { return String(localized: "Hooks not installed") }
             if def.id == "agent_muse"          && !HookServer.museHooksInstalled()       { return String(localized: "Hooks not installed") }
+            if def.id == "agent_pi" && !PiHookSetup().status().configured { return "Pi setup incomplete" }
             if def.id == "agent_opencode"      && !HookServer.openCodePluginInstalled()  { return String(localized: "Plugin not installed") }
             if def.id == "agent_amp"           && !HookServer.ampPluginInstalled()       { return String(localized: "Plugin not installed") }
             if def.id == SpotifyController.pillId && !SpotifyController.shared.isInstalled { return String(localized: "Not installed") }
