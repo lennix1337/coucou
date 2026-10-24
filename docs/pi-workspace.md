@@ -48,6 +48,10 @@ the task was validated.
 - A new `UserPromptSubmit` acknowledges a pending completion from that exact
   session. The finished card returns to the overview and its badge is cleared;
   unrelated sessions cannot acknowledge it. No keystrokes are monitored.
+- Returning to the completed response's terminal app dismisses its visible success
+  notice and clears its badge. This uses macOS app activation, not keyboard monitoring
+  or terminal contents; it acknowledges the app, not a particular tab. Unknown hosts,
+  stale completions, failures, interruptions, questions and permissions stay untouched.
 - A completion is quiet only when the session received a prompt within two minutes
   and its host is still foreground. Foreground alone is insufficient, and unknown
   terminal tabs remain a limitation. Errors, interruptions, questions and permission

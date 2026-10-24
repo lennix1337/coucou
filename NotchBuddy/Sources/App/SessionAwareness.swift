@@ -58,6 +58,15 @@ struct SessionAwareness {
         }
     }
 
+    /// App-level acknowledgement only: never claims to identify a terminal tab.
+    mutating func acknowledgeCompletion(session: String, activatedHost: String?, completionHost: String?) -> Bool {
+        guard let host = completionHost, !host.isEmpty, activatedHost == host,
+              let entry = entries[session], entry.phase == .response,
+              latest[entry.pill] == session, completions[entry.pill] == session else { return false }
+        completions.removeValue(forKey: entry.pill)
+        return true
+    }
+
     func resumesCompletion(session: String) -> Bool {
         guard let entry = entries[session] else { return false }
         return completions[entry.pill] == session

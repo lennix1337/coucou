@@ -5,6 +5,9 @@ mkdir -p scratchpad
 swiftc NotchBuddy/Sources/App/SessionAwareness.swift tests/SessionAwarenessTests.swift \
   -o scratchpad/session-awareness-tests
 scratchpad/session-awareness-tests
+swiftc NotchBuddy/Sources/App/SessionAwareness.swift tests/CompletionFocusTests.swift \
+  -o scratchpad/completion-focus-tests
+scratchpad/completion-focus-tests
 swiftc NotchBuddy/Sources/App/PiHookSetup.swift tests/PiHookSetupTests.swift \
   -o scratchpad/pi-hook-setup-tests
 scratchpad/pi-hook-setup-tests

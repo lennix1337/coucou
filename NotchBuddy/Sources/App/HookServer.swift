@@ -59,6 +59,8 @@ final class HookServer: @unchecked Sendable {
     private var focusBeforeAlert: String? = nil       // saved focus while another pill's card shows
     private var alertPill: String? = nil              // the pill that took the focus for its alert
     private var sessions = PillSessionRegistry()      // live sessions behind each pill
+    private var activationObserver: NSObjectProtocol?
+    @MainActor private var completionNotice: (session: String, pill: String, host: String?)?
 
     private init() {}
 
@@ -284,6 +286,33 @@ final class HookServer: @unchecked Sendable {
         installHookScript()
         #endif
         Thread.detachNewThread { self.serverThread() }
+        // Singleton lifetime. Observe app activation, not global keys or terminal contents.
+        DispatchQueue.main.async { self.observeCompletionHost() }
+    }
+
+    @MainActor
+    private func observeCompletionHost() {
+        guard activationObserver == nil else { return }
+        activationObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
+        ) { [weak self] notification in
+            let host = (notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication)?.bundleIdentifier
+            Task { @MainActor in self?.acknowledgeCompletionHost(host) }
+        }
+    }
+
+    @MainActor
+    private func acknowledgeCompletionHost(_ host: String?) {
+        let state = AppState.shared
+        guard let notice = completionNotice, state.view == .finished,
+              state.focusId == notice.pill, state.pendingApproval == nil, state.pendingQuestion == nil,
+              SessionActivity.shared.awareness.acknowledgeCompletion(
+                session: notice.session, activatedHost: host, completionHost: notice.host) else { return }
+        completionNotice = nil
+        clearPillBadge(id: notice.pill)
+        state.view = .overview
+        NotificationCenter.default.post(name: .islandCollapse, object: nil)
+        restoreAlertFocus()
     }
 
     // MARK: - Socket server (background thread)
@@ -494,7 +523,9 @@ final class HookServer: @unchecked Sendable {
         let focused = state.focusId == agentId
         // Foreground alone cannot identify a terminal tab. Only a recent prompt from
         // this exact session permits quiet completion; errors and questions still alert.
-        let foregroundHost = hostApp ?? (validAgent == "pi" ? "com.mitchellh.ghostty" : nil)
+        let foregroundHost = hostApp
+            ?? ClaudeHost.terminal(termProgram: termProgram, bundleId: bundleId)?.bundleId
+            ?? (validAgent == "pi" ? "com.mitchellh.ghostty" : nil)
         let terminalInFront = activity.awareness.quietCompletion(
             session: sessionId, hostInFront: foregroundHost != nil
                 && NSWorkspace.shared.frontmostApplication?.bundleIdentifier == foregroundHost)
@@ -654,6 +685,7 @@ final class HookServer: @unchecked Sendable {
             // Child completion stays in its parent's activity summary; failures still alert.
             if !terminalInFront && safeParent == nil { SoundEngine.shared.play("finish") }
             if !terminalInFront && safeParent == nil && showsAlert(for: agentId, focused: focused) {
+                completionNotice = (sessionId, agentId, foregroundHost)
                 expandIfNeeded(to: .finished)
             } else {
                 setPillBadge(id: agentId, badge: .finished)
