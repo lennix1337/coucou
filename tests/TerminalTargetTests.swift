@@ -8,6 +8,13 @@ struct TerminalTargetTests {
             if cond { print("✓ \(msg)") } else { print("✗ \(msg)"); failures += 1 }
         }
 
+        check(TerminalTarget.preferredBundleId(pillId: "agent_pi") == "com.mitchellh.ghostty",
+              "Pi opens Ghostty even before a session exists")
+        check(TerminalTarget.preferredBundleId(pillId: "integration_claude") == nil,
+              "other workspaces retain their existing routing")
+        check(TerminalTarget.preferredBundleId(pillId: nil) == nil,
+              "missing task does not acquire a Pi host")
+
         // The session's own app wins over the fixed list
         check(TerminalTarget.pick(sessionBundleId: "com.cmuxterm.app",
                                   running: ["com.apple.Terminal", "com.cmuxterm.app"]) == "com.cmuxterm.app",

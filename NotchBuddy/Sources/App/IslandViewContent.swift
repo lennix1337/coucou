@@ -287,6 +287,10 @@ struct OverviewView: View {
             #endif
         case "agent_claude-desktop":
             openClaudeDesktopApp()
+        case "agent_pi":
+            #if !APPSTORE
+            openSessionApp(state.tasks.first { $0.id == "agent_pi" }, pillId: "agent_pi")
+            #endif
         case "agent_gemini", "agent_antigravity",
              "agent_copilot", "agent_muse", "agent_opencode", "agent_amp":
             #if !APPSTORE
@@ -725,7 +729,12 @@ struct ErrorView: View {
 
 #if !APPSTORE
 /// The app a session runs in (its terminal, or VS Code), else any known terminal.
-private func openSessionApp(_ task: AgentTask?) {
+private func openSessionApp(_ task: AgentTask?, pillId: String? = nil) {
+    if let bundleId = TerminalTarget.preferredBundleId(pillId: pillId ?? task?.id),
+       let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) {
+        NSWorkspace.shared.openApplication(at: url, configuration: .init(), completionHandler: nil)
+        return
+    }
     if !(task?.id == "integration_claude" && ClaudeHost.activate(task?.hostApp)),
        !TerminalTarget.activate(sessionBundleId: task?.sessionBundleId) {
         NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Utilities/Terminal.app"))
@@ -4168,7 +4177,8 @@ struct AgentPill: View {
 
     // The Claude pill shows "VS Code" (or "Claude Code" for a terminal session) regardless of project name
     private var displayName: String {
-        task.id == "integration_claude" ? ClaudeHost.pillName(hostApp: task.hostApp) : task.name
+        if task.id == "agent_pi" { return "Pi" }
+        return task.id == "integration_claude" ? ClaudeHost.pillName(hostApp: task.hostApp) : task.name
     }
 
     var body: some View {

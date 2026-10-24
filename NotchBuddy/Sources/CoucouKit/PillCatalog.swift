@@ -54,6 +54,7 @@ struct PillDefinition {
     var sessionSubtitle: String {
         switch id {
         case "integration_claude": return "Claude Code"
+        case "agent_pi":           return "Pi"
         case "agent_cursor":       return "Cursor"
         case "agent_codex":        return "Codex"
         case "agent_hermes":       return "Hermes"
@@ -69,6 +70,8 @@ enum PillCatalog {
     // All declared pills in display order.
     static let all: [PillDefinition] = [
         // ── Where you code ───────────────────────────────────────────────────
+        .init(id: "agent_pi", name: "Pi", color: "#F59E0B",
+              category: .workspace, subtitle: "Pi Agent", source: .agent, githubOnly: true),
         .init(id: "integration_claude",  name: "VS Code",     color: "#F5F6F8",
               category: .workspace, subtitle: String(localized: "Integration"),  source: .claudeCode),
         .init(id: "agent_cursor",        name: "Cursor",      color: "#C0C4CC",
@@ -144,7 +147,11 @@ enum PillCatalog {
     }
 
     /// Default ID for the always-on main workspace pill.
+    #if APPSTORE
     static let defaultMainPillId = "integration_claude"
+    #else
+    static let defaultMainPillId = "agent_pi"
+    #endif
 
     /// Looks up a definition by task ID (nil if not in catalog).
     static func definition(for id: String) -> PillDefinition? {

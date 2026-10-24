@@ -3,6 +3,11 @@ import Foundation
 /// Picks which app "Open terminal" / ⌃⌥T should bring to the front.
 /// Foundation only, so it can be tested without AppKit (see scripts/test-terminal-target.sh).
 enum TerminalTarget {
+    /// The personal Pi workspace opens Ghostty, including before the first session.
+    static func preferredBundleId(pillId: String?) -> String? {
+        pillId == "agent_pi" ? "com.mitchellh.ghostty" : nil
+    }
+
     /// Terminals tried, in order, when the session's own app is unknown or not running.
     static let knownTerminals = [
         "com.apple.Terminal", "com.googlecode.iterm2", "net.kovidgoyal.kitty",
