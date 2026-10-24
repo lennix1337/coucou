@@ -471,12 +471,33 @@ final class HookServer: @unchecked Sendable {
             return
         }
 
+        let activity = SessionActivity.shared
+        let resumesCompletion = name == "UserPromptSubmit"
+            && activity.awareness.resumesCompletion(session: sessionId)
+        let parent = payload["coucou_parent_session"] as? String
+        let isDelegate = validAgent?.hasPrefix("pi-child-") == true || validAgent?.hasPrefix("pi-acp-") == true
+        let safeParent = parent.flatMap { value in
+            isDelegate && value.count <= 512 && value != sessionId && !value.isEmpty
+                && value.unicodeScalars.allSatisfy { CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_.:-").contains($0) }
+                ? value : nil
+        }
+        activity.awareness.record(event: name, session: sessionId, pill: agentId,
+                                  parent: safeParent,
+                                  model: AgentIdentity.modelName(payload["coucou_model"] as? String))
+        if resumesCompletion {
+            clearPillBadge(id: agentId)
+            if state.focusId == agentId, state.view == .finished,
+               state.pendingApproval == nil, state.pendingQuestion == nil {
+                state.view = .overview
+            }
+        }
         let focused = state.focusId == agentId
-        // The user is looking at the session's terminal: a finish or an error is already in
-        // front of them, so the pill only takes a badge (no sound, no reveal). Warp exposes
-        // no active tab, so a sibling session in another tab of the same terminal is quiet too.
-        let terminalInFront = hostApp != nil
-            && NSWorkspace.shared.frontmostApplication?.bundleIdentifier == hostApp
+        // Foreground alone cannot identify a terminal tab. Only a recent prompt from
+        // this exact session permits quiet completion; errors and questions still alert.
+        let foregroundHost = hostApp ?? (validAgent == "pi" ? "com.mitchellh.ghostty" : nil)
+        let terminalInFront = activity.awareness.quietCompletion(
+            session: sessionId, hostInFront: foregroundHost != nil
+                && NSWorkspace.shared.frontmostApplication?.bundleIdentifier == foregroundHost)
         // Several sessions can share one pill (it is chosen from the client, not from the
         // session). The registry tells a turn-ending event whether it may touch the pill,
         // and which session owns the project name shown on it.
@@ -560,6 +581,10 @@ final class HookServer: @unchecked Sendable {
             upsertTask(pill: agentId, display: display, working: true,
                        externalAgent: isExternalAgent ? validAgent : nil)
             let isQuestion = tool == "ask_question" || tool.hasSuffix(":ask_question")
+            if isQuestion {
+                activity.awareness.record(event: "Question", session: sessionId, pill: agentId,
+                                          parent: safeParent, model: nil)
+            }
             state.updateTask(id: agentId, state: isQuestion ? .question : .working)
             let input = payload["tool_input"] as? [String: Any] ?? [:]
             let step = localizedStep(tool: tool, input: input)
@@ -596,8 +621,12 @@ final class HookServer: @unchecked Sendable {
                 state.updateTask(id: agentId, state: .ratelimit)
                 SoundEngine.shared.play("rate")
             } else if message.hasSuffix("?") {
+                activity.awareness.record(event: "Question", session: sessionId, pill: agentId,
+                                          parent: safeParent, model: nil)
                 state.updateTask(id: agentId, state: .question)
                 appendStep(id: agentId, step: message)
+                SoundEngine.shared.play("question")
+                if showsAlert(for: agentId, focused: focused) { expandIfNeeded(to: .question) }
             }
 
         case "Stop":
@@ -620,15 +649,24 @@ final class HookServer: @unchecked Sendable {
             if !finalText.isEmpty, let idx = state.tasks.firstIndex(where: { $0.id == agentId }) {
                 state.tasks[idx].finalLine = finalText
             }
-            if !terminalInFront { SoundEngine.shared.play("finish") }
-            if !terminalInFront && showsAlert(for: agentId, focused: focused) {
+            activity.awareness.presentCompletion(session: sessionId)
+            let completionGeneration = activity.awareness.entries[sessionId]?.generation
+            // Child completion stays in its parent's activity summary; failures still alert.
+            if !terminalInFront && safeParent == nil { SoundEngine.shared.play("finish") }
+            if !terminalInFront && safeParent == nil && showsAlert(for: agentId, focused: focused) {
                 expandIfNeeded(to: .finished)
             } else {
                 setPillBadge(id: agentId, badge: .finished)
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 5.2) {
                 // A session (this one or a sibling) may have started a new turn meanwhile.
-                guard self.sessions.workingCount(pill: agentId) == 0 else { return }
+                guard self.sessions.workingCount(pill: agentId) == 0,
+                      let generation = completionGeneration,
+                      SessionActivity.shared.awareness.completionIsCurrent(session: sessionId, generation: generation),
+                      !SessionActivity.shared.awareness.workers(of: sessionId).contains(where: {
+                          [.working, .question, .permission].contains($0.phase)
+                      })
+                else { return }
                 if isExternalAgent {
                     AppState.shared.removeTask(id: agentId)
                 } else {
@@ -648,8 +686,8 @@ final class HookServer: @unchecked Sendable {
             if let idx = state.tasks.firstIndex(where: { $0.id == agentId }) {
                 state.tasks[idx].finalLine = Self.stopFailureDetail(payload)
             }
-            if !terminalInFront { SoundEngine.shared.play("error") }
-            if !terminalInFront && showsAlert(for: agentId, focused: focused) {
+            SoundEngine.shared.play("error")
+            if showsAlert(for: agentId, focused: focused) {
                 expandIfNeeded(to: .error)
             } else {
                 setPillBadge(id: agentId, badge: .error)
@@ -662,8 +700,12 @@ final class HookServer: @unchecked Sendable {
             applyDisplayOwner(pill: agentId)
             guard interruptScope == .pill else { break }
             activeSessionId = nil
-            state.updateTask(id: agentId, state: .idle)
-            clearPillBadge(id: agentId)
+            state.updateTask(id: agentId, state: .error)
+            if let idx = state.tasks.firstIndex(where: { $0.id == agentId }) {
+                state.tasks[idx].finalLine = "Response interrupted — completion not confirmed"
+            }
+            setPillBadge(id: agentId, badge: .error)
+            if showsAlert(for: agentId, focused: focused) { expandIfNeeded(to: .error) }
 
         case "SessionEnd":
             // Only the last session behind the pill may take the card and its diffs down.
@@ -877,6 +919,8 @@ final class HookServer: @unchecked Sendable {
         let toolInput = payload["tool_input"] as? [String: Any] ?? [:]
         let inputKey = Self.approvalInputKey(toolInput)
         nbLog("PermissionRequest \(tool) [\(pillId)]")
+        SessionActivity.shared.awareness.record(event: "PermissionRequest", session: sessionId,
+                                               pill: pillId, parent: nil, model: nil)
 
         // AskUserQuestion is now handled via the dedicated --ask PreToolUse hook.
         // If it still arrives here as a PermissionRequest, reply "ask" so Claude Code
@@ -1052,6 +1096,8 @@ final class HookServer: @unchecked Sendable {
                 DispatchQueue.main.async { oldSrc?.cancel() }
             }
         }
+        SessionActivity.shared.awareness.record(event: "Question", session: sessionId,
+                                               pill: pillId, parent: nil, model: nil)
         pendingQuestionFD = fd
         activeSessionId = sessionId
         questionPillId = pillId

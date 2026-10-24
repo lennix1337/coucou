@@ -21,6 +21,7 @@ struct PiHookSettingsView: View {
                 }
                 Text("After installation, run /reload in Pi. Only session, model and tool metadata is relayed; permissions remain in Pi.")
                     .font(.caption).foregroundStyle(.secondary)
+                SessionActivityView()
                 if !message.isEmpty { Text(message).font(.caption).textSelection(.enabled) }
             }.frame(maxWidth: .infinity, alignment: .leading).padding(6)
         }.onAppear { status = PiHookSetup().status() }

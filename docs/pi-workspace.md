@@ -40,7 +40,32 @@ App Store builds retain their original workspace default.
 The Pi card shows `Pi · provider/model-id` when the extension supplies bounded
 `coucou_model` metadata. It follows the session that owns the card, not a sibling
 session's model. Missing metadata shows only Pi; the app never guesses Claude Code
-or Codex from a terminal. Completion uses the neutral “Session finished” label.
+or Codex from a terminal. Completion uses “Response finished”: this does not claim
+the task was validated.
+
+## Session awareness
+
+- A new `UserPromptSubmit` acknowledges a pending completion from that exact
+  session. The finished card returns to the overview and its badge is cleared;
+  unrelated sessions cannot acknowledge it. No keystrokes are monitored.
+- A completion is quiet only when the session received a prompt within two minutes
+  and its host is still foreground. Foreground alone is insufficient, and unknown
+  terminal tabs remain a limitation. Errors, interruptions, questions and permission
+  requests are not silenced by this completion policy.
+- Delayed completion cleanup is generation-checked: a new turn, a failure or a
+  sibling event invalidates the old timer.
+- Native Pi children send `coucou_parent_session`. The parent overview summarizes
+  leaf workers and those needing attention; individual cards stay addressable.
+  Child completion does not create a second completion popup. Failures still alert.
+  A parent finishing never implies a child finished. ACP's current hook does not
+  supply an owning Pi session, so those cards remain independent, not falsely grouped.
+- Settings → Agents → Pi Agent separates configuration checks from runtime metadata:
+  last event/time, owning model (or unknown), session suffix and child state. After
+  two minutes of silence it says “No recent signal,” not “stalled.” Receipt proves
+  delivery at that time, not continued liveness. Data stays in memory, bounded to
+  256 sessions; no prompts, answers or tool arguments are added to this health view.
+  Permission state is shown only when an explicit permission event is received;
+  Pi/ACP permissions continue to be owned by their harness, not Coucou.
 
 To revert, quit Coucou, restore `scratchpad/Coucou.previous.app` to
 `/Applications/Coucou.app`, and choose the desired workspace in Settings.

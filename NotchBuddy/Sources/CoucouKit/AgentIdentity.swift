@@ -4,10 +4,15 @@ import Foundation
 enum AgentIdentity {
     static func displayName(agent: String, model: String?) -> String {
         let client = agent == "pi" ? "Pi" : agent
-        guard agent == "pi", let model, !model.isEmpty, model.count <= 160,
+        guard agent == "pi", let model = modelName(model) else { return client }
+        return "\(client) · \(model)"
+    }
+
+    static func modelName(_ model: String?) -> String? {
+        guard let model, !model.isEmpty, model.count <= 160,
               model.unicodeScalars.allSatisfy({
                   CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_./:@+ -").contains($0)
-              }) else { return client }
-        return "\(client) · \(model)"
+              }) else { return nil }
+        return model
     }
 }

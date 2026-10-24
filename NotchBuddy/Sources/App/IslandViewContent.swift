@@ -105,6 +105,7 @@ struct OverviewView: View {
                                     .foregroundColor(Color(hex: "#8E939C"))
                                     .lineLimit(1)
                                     .truncationMode(.tail)
+                                SessionFamilyView(pill: agent.id)
                                 Spacer(minLength: 2)
                                 if agent.steps.count > 1 {
                                     Text("\(min(agent.stepIndex + 1, agent.steps.count))/\(agent.steps.count)")
@@ -656,6 +657,12 @@ struct QuestionView: View {
 
 struct ErrorView: View {
     @ObservedObject var state: AppState
+    @ObservedObject private var activity = SessionActivity.shared
+
+    private var interrupted: Bool {
+        activity.awareness.entries.values.filter { $0.pill == task?.id }
+            .max(by: { $0.receivedAt < $1.receivedAt })?.phase == .interrupted
+    }
 
     private var task: AgentTask? { state.focusTask }
 
@@ -686,7 +693,8 @@ struct ErrorView: View {
             CardBackground(wash: .red)
             VStack(alignment: .leading, spacing: 5) {
                 AgentWho(task: task, label: kind)
-                Text(task?.source == .n8n ? LocalizedStringKey("Workflow stopped.") : LocalizedStringKey("Session stopped on an error."))
+                Text(task?.source == .n8n ? LocalizedStringKey("Workflow stopped.")
+                     : interrupted ? LocalizedStringKey("Response interrupted.") : LocalizedStringKey("Response failed."))
                     .font(.system(size: 15, weight: .semibold))
                 Text(detail)
                     .font(.system(size: 12))
@@ -760,11 +768,12 @@ struct FinishedView: View {
         ZStack {
             CardBackground(wash: .green)
             VStack(alignment: .leading, spacing: 5) {
-                AgentWho(task: state.focusTask, label: "Session finished")
+                AgentWho(task: state.focusTask, label: "Response finished")
+                if let task = state.focusTask { SessionFamilyView(pill: task.id) }
                 Text({
                     if let fl = state.focusTask?.finalLine { return fl }
                     if let s = state.focusTask?.steps.last(where: { !$0.isDiffStep }) { return s }
-                    return String(localized: "Session finished")
+                    return String(localized: "Response finished — task validation is separate")
                 }())
                     .font(.system(size: 15, weight: .semibold))
                     .lineLimit(1)
